@@ -1,0 +1,385 @@
+openapi: 3.0.1
+info:
+  title: Novo Patient Record ingestion from SFHC
+  description: |
+    - Created By: B.Rekrut - Merkle- 08-FEB-2023
+    - Modified By: B. Rekrut - Merkle  13-MAR-2023
+      - update to Patient record misc object for token, updateDate, and patientType
+
+      
+  termsOfService: http://swagger.io/terms/
+  contact:
+    email: Bryan.Rekrut@merkle.com
+  license:
+    name: Apache 2.0
+    url: http://www.apache.org/licenses/LICENSE-2.0.html
+  version: 1.0.0
+
+
+paths:
+  /{inletID}:
+    post:
+      tags:
+        - Patient Record Inlet collection
+      servers:
+        - url: https://dcs.adobedc.net/collection
+          description: AEP Data Collection API
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: inletID
+          example: 8dc9950402847eaebc36a0001541960180480f81abc35a31e46d6baa391a435a
+          description: AEP inlet ID (above is dev inletID)
+          schema:
+            type: integer
+          required: true
+        - in: header
+          name: sandbox-name
+          description: | 
+            Name of the AEP sandbox which the /Post is being performed. nni-patient-dev is dev instance
+          example: nni-patient-dev
+          schema: 
+           type: string
+          required: true
+      requestBody:
+        content:
+          application/json:
+            schema:
+              oneOf:
+                - $ref: '#/components/schemas/patientRecordRequest'
+                - $ref: '#/components/schemas/patientRecordUpdate'
+      responses:
+        '200':
+          description: Data was ingested
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/httpSuccessBody'
+
+        '400':
+          description: There was a problem with the request.  See body for specific order Details
+        '401':
+          description: Access is unauthorized.  Please provide a bearer token
+        '403':
+          description: Access is forbidden
+        '413':
+          description: Payload is larger than 1 MB
+        '429':
+          description: Too many requests.
+        '500':
+          description: Interal server error has occured
+        '503':
+          description: The service is currently unavilable.
+
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+        
+  schemas:
+    patientRecordRequest:
+        type: object
+        properties:
+          header:
+            type: object
+            required:
+              - imsOrgId
+              - dataSetId
+            properties:
+              schemaRef:
+                type: object
+                required:
+                  - id
+                  - contentType
+                properties:
+                  id:
+                    type: string
+                    example: https://ns.adobe.com/novo/schemas/e57d39e40cf0c9272cf57a53d2ee7e97b4012ae92970f94c
+                    description: Schema ID of dev instance.
+                  contentType:
+                    type: string
+                    example: application/vnd.adobe.xed-full+json;version=1.0
+              imsOrgId:
+                type: string
+                description: IMS org for Novo
+                example: 0D643DE35A4F3EFC0A495E43@AdobeOrg
+              source:
+                type: object
+                properties:
+                  name:
+                    type: string
+                    description: Name of AEP inlet
+              dataSetId:
+                type: string
+                example: 640f5daec5d7c41bd0da1041
+                description: AEP DataSet id of Patient survey
+          body:
+            type: object
+            properties:
+              xdmMeta:
+                type: object
+                properties:
+                  schemaRef:
+                    type: object
+                    description: schema which data is being posted to in AEP
+                    properties:
+                      id:
+                        type: string
+                        example: https://ns.adobe.com/novo/schemas/e57d39e40cf0c9272cf57a53d2ee7e97b4012ae92970f94c
+                        description: Schema ID of dev instance.
+                      contentType:
+                        type: string
+                        example: application/vnd.adobe.xed-full+json;version=1.0
+              xdmEntity:
+                type: object
+                properties:
+                  _novo:
+                    type: object
+                    properties:
+                      patientIdentity:
+                        type: object
+                        required:
+                          - sourceSystemID
+                          - emailAddress
+                        properties:
+                          sourceSystemID:
+                            type: string
+                          emailAddress:
+                            type: string
+                          icdpId:
+                            type: string
+                      
+
+                      patientPII:
+                        type: object 
+                        properties:
+                          saluation:
+                            type: string
+                          gender:
+                            type: string
+                            enum: 
+                              - M
+                              - F
+                              - undefined
+                          firstName:
+                            type: string
+                          lastName: 
+                            type: string
+                          birthdate:
+                            type: string
+                            example: YYYY-MM-DD
+                      patientAddress:
+                        type: object
+                        properties:
+                          address1:
+                            type: string
+                          address2:
+                            type: string
+                          city: 
+                            type: string
+                          state: 
+                            type: string
+                          zipCode:
+                            type: string
+                      
+                      contactDetails:
+                        type: object
+                        properties:
+                          globalOpt:
+                            type: boolean
+                          optInDate: 
+                            type: string
+                            example: YYYY-MM-DD
+                          optOutDate:
+                            type: string
+                            example: YYYY-MM-DD
+                          smsOpt:
+                            type: boolean
+                          directMailOpt:
+                            type: boolean
+                          phoneOpt:
+                            type: boolean
+                          primaryNumber:
+                            type: object 
+                            properties:
+                              phoneNumber:
+                                type: string
+                                example: ###-###-####
+                              voiceCall:
+                                type: boolean
+                              txtMsg:
+                                type: boolean
+                          secondaryNumber:
+                            type: object
+                            properties:
+                              phoneNumber:
+                                type: string
+                                example: ###-###-####
+                              voiceCall: 
+                                type: boolean
+                              txtMsg:
+                                type: boolean
+                      patientRecordMisc:
+                        type: object
+                        properties:
+                          consents:
+                            type: array
+                            items:
+                              type: object
+                              properties:
+                                consentType:
+                                  type: string
+                                  description: | 
+                                    Consent types -- consents for Wegovy: NNIPERM (global mktg consent), DATASHARE, HIPAACSNT, 
+                                    MKTRESRCH, PHNATT, PKHLTHOPD, PKHLTHOPT, REMTX, TXTATTWGY, WGYGENTX, WGYREMTX, MKTRESRC2 (?), 
+                                    TSTMNALVC  (?), TSTMNALVM (?)			
+                                    
+                                optInValue:
+                                  type: boolean
+                                  description: Value of Consent Type
+                          patientType:
+                            type: string
+                            description: The type of patient record
+                            enum: [Patient, Caregiver of Adult, Caregiver of Teen]
+                          tok1trst:
+                              type: string
+                              description: oneTrustToken
+                          novoAudit:
+                            type: object
+                            properties:
+                              createDateTime:
+                                type: string
+                                format: date
+                                description: create update date of profile record
+    patientRecordUpdate:
+      type: object
+      properties:
+        header:
+          type: object
+          required:
+            - msgType
+            - msgId
+            - xactionId
+            - createdAt
+            - originalTimestamp
+            - dataSetID
+            - imsOrgid            
+          properties:
+            msgType:
+              type: string
+              example: xdmEntityUpdate
+            msgId:
+              type: string
+              description: guid value for request
+              example: c4539cde-648a-416e-bb13-4f13f53d784c
+              pattern: ^[0-9a-z]{8}-?[0-9a-z]{4}-?[0-9a-z]{4}-?[0-9a-z]{4}-?[0-9a-z]{12}$
+            imsOrgid:
+              type: string
+              example: 0D643DE35A4F3EFC0A495E43@AdobeOrg
+              default: 0D643DE35A4F3EFC0A495E43@AdobeOrg
+            xactionId:
+              type: string
+              description: This value shoudld be the combination of an ISO timesamep and guid
+              example: 2023-01-06T15:30:03.155Z898f1bc4-7c7b-407f-a834-1f62c671e96b
+            createdAt: 
+              type: integer
+              description: epoch time of event 
+              example:  1673019003154
+            originalTimestamp:
+              type: integer
+              description: epoch 
+              example: 1673019003154
+            dataSetID:
+              type: string
+              description: dataSetID which upsert is being performed
+              example: 640f5daec5d7c41bd0da1041
+            dataStreamId:
+              type: string
+            xdmSchema:
+              type: object
+              required:
+              - name
+              - version
+              properties: 
+                name:  
+                  type: string
+                  example: _xdm.context.profile
+                  default: _xdm.context.profile
+                version:
+                  type: string
+                  example: "1.0"
+                  default: "1.0"
+        body:
+          type: object
+          properties:
+            xdmEntityUpdates:
+              type: object
+              properties:
+                _novo:
+                  type: object
+                  properties:
+                    identity:
+                      type: object
+                      required:
+                        - sourceSystemID
+                      properties:
+                        sourceSystemID:
+                            type: string
+
+                    contactDetails:
+                        type: object
+                        description: | 
+                          These are optional and only one of these can be passed into the endpoint
+                        properties:
+                          globalOpt:
+                            type: boolean
+                          optInDate: 
+                            type: string
+                            example: YYYY-MM-DD
+                          optOutDate:
+                            type: string
+                            example: YYYY-MM-DD
+                          smsOpt:
+                            type: boolean
+                          directMailOpt:
+                            type: boolean
+                          phoneOpt:
+                            type: boolean
+                    novoAudit:
+                          type: object
+                          required:
+                            - createUpdateDateTime
+                          properties:
+                            createUpdateDateTime:
+                              type: string
+                              description: Update of profile record for status
+
+
+          
+          
+                  
+                        
+                        
+    httpSuccessBody:
+      properties:
+        inletID:
+          type: string
+          description: The ID of the previously created streaming endpoint
+        xactionId:
+          type: string
+          description: The xactionID is a unique identifier generated server-side for the XDM record you just sent. This ID helps Adobe trace this record's lifecycle through various systems and with debugging.
+        flowid:
+          type: string
+        recievedTimeMs:
+          type: integer
+          description: receivedTimeMs is a timestamp in milliseconds that shows what time the request was received.
+        synchronousValidation:
+          type: object
+          properties:
+            status: 
+              type: string
+              example: pass

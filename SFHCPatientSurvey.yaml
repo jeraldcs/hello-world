@@ -1,0 +1,449 @@
+openapi: 3.0.1
+info:
+  title: Novo Patient Survey ingestion from SFHC
+  description: |
+   Created By: B.Rekrut - Merkle- 08-FEB-2023
+   Modified By: B. Rekrut - Merkle  17-MAR-2023
+      - Changes to consent array struture in AEP
+      - Changes to schema and datasetIDs
+      - Added query string parmater for sync valiation
+
+
+      
+  termsOfService: http://swagger.io/terms/
+  contact:
+    email: Bryan.Rekrut@merkle.com
+  license:
+    name: Apache 2.0
+    url: http://www.apache.org/licenses/LICENSE-2.0.html
+  version: 1.0.0
+
+
+paths:
+  /{inletID}:
+    post:
+      tags:
+        - Patient Survey Inlet collection
+      servers:
+        - url: https://dcs.adobedc.net/collection
+          description: AEP Data Collection API
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: inletID
+          example: 4f09df564d0440bd1f6aedbd2c95a4f06434efc7849bd7b48ac7c2c103eccc90
+          description: AEP inlet ID
+          schema:
+            type: integer
+          required: true
+        - in: query
+          name: synchronousValidation
+          required: false
+          schema:
+            type: string
+          example: true
+         
+        - in: header
+          name: sandbox-name
+          description: Name of the AEP sandbox which the /Post is being performed
+          example: nni-patient-dev
+          schema: 
+           type: string
+          required: true
+       
+         
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/patientSurveyRequest'
+      responses:
+        '200':
+          description: Data was ingested
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/httpSuccessBody'
+
+        '400':
+          description: There was a problem with the request.  See body for specific order Details
+        '401':
+          description: Access is unauthorized.  Please provide a bearer token
+        '403':
+          description: Access is forbidden
+        '413':
+          description: Payload is larger than 1 MB
+        '429':
+          description: Too many requests.
+        '500':
+          description: Interal server error has occured
+        '503':
+          description: The service is currently unavilable.
+
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+        
+  schemas:
+    patientSurveyRequest:
+        type: object
+        properties:
+          header:
+            type: object
+            required:
+              - imsOrgId
+              - dataSetId
+            properties:
+              schemaRef:
+                type: object
+                required:
+                  - id
+                  - contentType
+                properties:
+                  id:
+                    type: string
+                    example: https://ns.adobe.com/novo/schemas/e2d5e6bbdca1f1ffe49764a7551fa244ecef6117c3f7614c
+                    description: schema which data is being posted to in AEP (dev)
+                  contentType:
+                    type: string
+                    example: application/vnd.adobe.xed-full+json;version=1.0
+                    description: default value which defines the content type of the schema
+              imsOrgId:
+                type: string
+                description: IMS org for novo
+                example: 0D643DE35A4F3EFC0A495E43@AdobeOrg
+              source:
+                type: object
+                properties:
+                  name:
+                    type: string
+                    description: Name of AEP inlet
+              dataSetId:
+                type: string
+                example: 6414a1ac811e641c068233c7
+                description: AEP DataSet id of Patient survey in dev
+          body:
+            type: object
+            properties:
+              xdmMeta:
+                type: object
+                properties:
+                  schemaRef:
+                    type: object
+                    description: schema which data is being posted to in AEP
+                    properties:
+                      id:
+                        type: string
+                        description: schema which data is being posted to in AEP
+                        example: https://ns.adobe.com/novo/schemas/e2d5e6bbdca1f1ffe49764a7551fa244ecef6117c3f7614c
+                      contentType:
+                        type: string
+                        example: application/vnd.adobe.xed-full+json;version=1.0
+                        description: default value which defines the content type of the schema
+              xdmEntity:
+                type: object
+                required:
+                  - _id
+                  - timestamp
+                  - eventType
+                  - producedBy
+                properties:
+                  _id:
+                    type: string
+                    description: |
+                      This is a unique identifier can be ExternalSystemTransactionId 
+                      or AEP can generate the GUID
+                  timestamp:
+                    type: string
+                    description: |
+                      This is timestamp of when the event occured. This  can be SurveyResponseDateTimeStamp
+                    example: 2021-10-26T10:10:24Z
+                  eventType:
+                    type: string
+                    example: patient.surveyStarted, patient.surveyCompleted
+                    description: event type of patient survey. Will be patient.surveyStarted or patient.surveyCompleted
+                  producedBy:
+                    type: string
+                    example: SFHC
+                    description: |
+                      This can be the value of the system code. 
+                      We are using this to identity the source system
+                  _novo:
+                    type: object
+                    properties:
+                      patientIdentity:
+                        type: object
+                        required:
+                            - sourceSystemID
+                        properties:
+                            sourceSystemID:
+                              type: string
+                            emailAddress:
+                              type: string
+                              description: |
+                                  Option field if email address is present. An empty string should 
+                                  not be use if email address is not present.
+                            icpid:
+                              type: string
+                      novoBrands:
+                        type: object
+                        required: 
+                            - brand
+                        properties:
+                          brands:
+                            type: string
+                            enum: [WEGOVY]
+                            
+  
+                                
+                      patientSurveyDetails:
+                        type: object
+                        properties:
+                          surveyResponse:
+                            type: object
+                            description: | 
+                              Promo response codes will be posted into this object
+                            properties:
+                              surveyCode:
+                                type: string
+                              responseSourceCode:
+                                type: string
+                                description: Relationship over to ResponseCodes
+                            #  questionNumber:
+                            #    type: string
+                            #  answerNumber:
+                            #    type: string
+                              # 01-MAR-2023 removed per 28-FEB-2023 meeting will use explicit NVP
+                            # openAnswerText:
+                            #   type: string
+                            #   description: Need follow-up if this is needed
+                              kitCode:
+                                type: string
+                                description: Patient Starter Kit code (pskcode)
+                  
+                              trailblazerRegistration: 
+                                type: boolean
+                                description: Trail Blazer Registration (TBLAZEREG)
+                              
+                          ## BJR updates 06-MAR-2023
+                              consents:
+                                type: array
+                                items:
+                                  type: object
+                                  properties:
+                                    consentType:
+                                      type: string
+                                      description: | 
+                                        Consent types -- consents for Wegovy: NNIPERM (global mktg consent), DATASHARE, HIPAACSNT, 
+                                        MKTRESRCH, PHNATT, PKHLTHOPD, PKHLTHOPT, REMTX, TXTATTWGY, WGYGENTX, WGYREMTX, MKTRESRC2 (?), 
+                                        TSTMNALVC  (?), TSTMNALVM (?)			
+                                      
+                                    optInValue:
+                                      type: boolean
+                                      description: Value of Consent Type
+                                    
+
+                              cardDetails:
+                                  type: object
+                                  properties:
+                                    cardGroupNum:
+                                      type: string
+                                      description: Saving Card Group Number (scrdgroup)
+                                    cardMemberID:
+                                      type: string
+                                      description: Saving Card ID Number (scrdidnum)
+                                    cardTransactionType:
+                                      type: string
+                                      enum: [NEEDCARD, ACTVCARD]
+                                      description: Card Transaction Type (cardAct)
+                                    
+                              patientHealthDetails:
+                                type: object
+                                properties:
+                                  currentWeight:
+                                    type: integer
+                                    description: Current weight of patient 
+                                  currentHeight:
+                                    type: integer
+                                    description: Current weight of patient in inches
+                                  currentWaist:
+                                    type: integer
+                                    description: Current waist size in inches of patient
+                                  weightGoal:
+                                    type: integer
+                                    description: Patient goal weight
+                              patientActivity:
+                                type: object
+                                properties:
+                                  lightActivity:
+                                    type: integer
+                                    description: Light Actitivy values 0,1,2
+                                  moderateActivity:
+                                    type: integer
+                                    description: Moderate Actitivy values 0,1,2
+                                  heavyActivity:
+                                    type: integer
+                                    description: Heavy Actitivy values 0,1,2
+                              patientGoalRating:
+                                type: object
+                                properties:
+                                  weightGoalConfidence:
+                                    type: integer
+                                    description: Weight Goal Confidence values 0,1,2,3,4
+                                  selfInjectionConfidence:
+                                    type: integer
+                                    description: Self Injection Confidence values 0,1,2,3,4
+                                  sideEffectsConfidence:
+                                    type: integer
+                                    description: Side Effects Confidence values 0,1,2,3,4
+                                  motivationFactor:
+                                    type: integer
+                                    description: Motivation Factor values 0,1,2,3,4
+                                  controlOfWeightPlan:
+                                    type: integer
+                                    description: Control Of Weight Plan values 0,1,2,3,4
+                                  
+                                  
+
+                              
+                              product:
+                                type: object
+                                properties: 
+                                  productType:
+                                    type: string
+                                    description: Product Type (MEDTYPE)
+                                  productName:
+                                    type: string
+                                  productCode:
+                                    type: string
+                                  productNdc:
+                                    type: string
+                                  productFamily:
+                                    type: string
+                                  productPrescribed:
+                                    type: boolean
+                                  productStartDate:
+                                    type: string
+                                    format: date
+                                    example: YYYY-MM-DD
+                                    description: produce start date (STARTDT)
+                                  timeOnProduct:
+                                    type: integer
+                                    description: Time on product (TIMEOTWGY)
+                              reminderDetails:
+                                type: object
+                                properties: 
+                                  reminderTime:
+                                    type: string
+                                    enum: [10AM, 10PM, 11AM, 11PM, 12AM, 12PM, 1AM, 1PM, 2AM, 2PM, 3AM, 3PM, 4AM, 4PM, 5AM, 5PM, 6AM, 6PM, 7AM, 7PM, 8AM, 8PM, 9AM, 9PM]
+                                    description: reminder time of day (REMTIME)
+                                  reminderDay:
+                                    type: string
+                                    enum: [FRI, MON, TUES, WEDS, THURS, SAT, SUN, NOREM]
+                                    description: reminder day (REMDAY)
+                                #BJR if this is primary phone this should beon the profile
+                              primaryPhone:
+                                type: string
+                                description: primary phone (PRIMPHN)
+                              #BJR if this is primary phone text then this should be on the profile store
+                              primaryPhoneText:
+                                type: string
+                                description: primary phone text (PRIMPHNTX)
+                                #BJR if this is primary phone voice then this should be on the profile store
+                                  #BJR if this is mobile phone then this should be on the profile store    
+                              primaryPhoneVoice :
+                                type: string 
+                                description: primary phone voice (PRIMPHNTX)
+                              mobilePhone:
+                                type: string
+                                description: mobile phone number (MOBPHN)
+                                #BJR if this is mobile phone txt then this should be on the profile store  
+                              mobilePhoneText:
+                                type: string
+                                description: mobile phone number txt (MOBPHNTX)
+                                #BJR if this is mobile phone  then this should be on the profile store    
+                              mobilePhoneVoice:
+                                type: string
+                                description: mobile phone number voice (MOBPHNVC)
+                              readyForPrescription :
+                                type: string
+                                description: readyForPrescription (HOWFEEL)
+                                enum: [MOREINFO, NOTSURE, READY]
+                
+                              registrationType :
+                                type: string
+                                description: Registration Type (REGCHOICE)
+                            
+                            
+            
+                              #BJR not sure why this should be present as an event attribute
+                              tok1trst:
+                                type: string
+                                description: oneTrustToken
+                          
+                              coaching:
+                                type: object
+                                properties:
+                                  coachingType: 
+                                    type: string
+                                    enum: [LIVE, DIGITAL,SELF]
+                                    description: Coaching selection (coachSEL)
+                                  coachingUpgradeDate:
+                                    type: string
+                                    format: date
+                                    example: YYYY-MM-DD
+                                    description: Coaching upgrade date (WCHUPGDT)
+                                  scheduleCoachCall:
+                                      type: boolean
+                                      description: Is coaching call scheduled
+                
+
+
+                              insurance: 
+                                type: object
+                                properties:
+                                  insuranceType:
+                                    type: string
+                                    enum: [GOVERMENT,PRIVATE]
+                                  hasGovernmentInsurance:
+                                    type: boolean
+                                    description: has government insurance
+                                  insuranceCovers:
+                                    type: string
+                                    description: Insurance coverage (INSCVWGVY)
+                              #Consents are part of the profile record level
+                              helpNeededWith:
+                                type: string
+                                enum: [HOWWORKS, LOSEWGHT,PARTWHCP,COST]
+                                description: What help is needed (whathelp)
+                       
+                          
+
+                                
+
+                        
+                        
+    httpSuccessBody:
+      properties:
+        inletID:
+          type: string
+          description: The ID of the previously created streaming endpoint
+        xactionId:
+          type: string
+          description: The xactionID is a unique identifier generated server-side for the XDM record you just sent. This ID helps Adobe trace this record's lifecycle through various systems and with debugging.
+        flowid:
+          type: string
+        recievedTimeMs:
+          type: integer
+          description: receivedTimeMs is a timestamp in milliseconds that shows what time the request was received.
+        synchronousValidation:
+          type: object
+          properties:
+            status: 
+              type: string
+              example: pass
